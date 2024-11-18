@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    # Pattern matched against refs/tags
+    tags:
+      - '*'           # Push events to every tag not containing /
+  workflow_dispatch:
+
+jobs:
+  cargo_checks:
+    name: Cargo Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust_toolchain/
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Check if the README is up to date.
+        run: |
+          cargo install cargo-rdme
+          cargo rdme --check
+      - name: Run tests
+        run: cargo test --features chrono,uuid,rust_decimal,time
+
+  test_examples:
+    name: Test Examples
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - bootstrap
+          - custom_renderers_svg
+          - custom_row_renderer
+          - editable
+          - generic
+          - getter
+          - i18n
+          - paginated_rest_datasource
+          - pagination
+          - selectable
+          - serverfn_sqlx
+          - simple
+          - tailwind
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust_toolchain/
+      - name: Build example ${{ matrix.example }}
+        run: |
+          cd ${{ github.workspace }}/examples/${{ matrix.example }}/
+          cargo build
+        shell: bash
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [ cargo_checks, test_examples ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust_toolchain/
+      - name: Publish crate leptos-struct-table
+        uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CRATES_TOKEN }}
+
+#  coverage:
+#    name: Coverage
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: Checkout sources
+#        uses: actions/checkout@v2
+#
+#      - name: Install rust
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          toolchain: stable
+#          profile: minimal
+#          override: true
+#
+#      - name: Cache
+#        uses: Swatinem/rust-cache@v1
+#
+#      - name: Install cargo-tarpaulin
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: install
+#          args: cargo-tarpaulin
+#
+#      - name: Run cargo tarpaulin
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: tarpaulin
+#          args: --output-dir coverage --out Lcov
+#
+#      - name: Publish to Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
